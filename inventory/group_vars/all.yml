@@ -1,0 +1,38 @@
+---
+# =============================================================
+# group_vars/all.yml — Variables globales del proyecto
+# =============================================================
+
+# Red de gestión (donde vive el contenedor Ansible)
+mgmt_network: "10.0.0.0/24"
+
+# Dominio del laboratorio
+dns_domain: "lab.local"
+
+# Configuración OSPF
+ospf_process_id: 1
+ospf_area: 0
+ospf_router_id_prefix: "1.1.1."   # Se completa con el número del router
+
+# Configuración IPSec
+ipsec_keyring_name: "VPN_KEYRING"
+ipsec_profile_name: "VPN_PROFILE"
+ipsec_transform_set: "VPN_TS"
+ipsec_preshared_key: "C1sc0Lab2024!"   # Reemplazar con ansible-vault en producción
+
+# MTU de los túneles GRE
+gre_tunnel_mtu: 1400
+gre_tunnel_bandwidth: 1000
+
+# Parámetros IKE (Phase 1 IPSec)
+ike_policy_number: 10
+ike_encryption: "aes 256"
+ike_hash: "sha256"
+ike_auth: "pre-share"
+ike_dh_group: 14
+ike_lifetime: 86400
+
+# Parámetros IPSec (Phase 2)
+ipsec_encryption: "esp-aes 256"
+ipsec_auth: "esp-sha256-hmac"
+ipsec_lifetime: 3600

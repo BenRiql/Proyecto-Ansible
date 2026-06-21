@@ -1,0 +1,16 @@
+# Ansible
+*.retry
+/tmp/ansible.log
+.vault_pass
+
+# Variables cifradas con vault (no versionar sin cifrar)
+# inventory/group_vars/all.yml  ← descomentar si usas vault
+
+# Python
+__pycache__/
+*.pyc
+.env
+
+# Editor
+.vscode/
+*.swp

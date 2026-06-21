@@ -1,0 +1,62 @@
+---
+# =============================================================
+# roles/ospf/tasks/main.yml
+# Configura OSPF sobre los túneles GRE/IPSec
+# =============================================================
+
+- name: "[OSPF] Configurar proceso OSPF y router-id"
+  cisco.ios.ios_ospfv2:
+    config:
+      processes:
+        - process_id: "{{ ospf_process_id }}"
+          router_id: "{{ ospf_router_id }}"
+          passive_interfaces:
+            default: false
+            interface:
+              - "{{ interfaces.lan.name }}"    # LAN no necesita OSPF activo
+          areas:
+            - area_id: "{{ ospf_area }}"
+              default_cost: 10
+    state: merged
+  notify: save config
+
+- name: "[OSPF] Anunciar redes por OSPF (loop)"
+  cisco.ios.ios_config:
+    lines:
+      - "network {{ item.network }} {{ item.wildcard }} area {{ item.area }}"
+    parents: "router ospf {{ ospf_process_id }}"
+  loop: "{{ ospf_networks }}"
+  loop_control:
+    label: "{{ item.network }}/{{ item.wildcard }}"
+  notify: save config
+
+- name: "[OSPF] Ajustar hello/dead intervals en túneles GRE"
+  cisco.ios.ios_config:
+    lines:
+      - "ip ospf hello-interval 10"
+      - "ip ospf dead-interval 40"
+      - "ip ospf network point-to-point"
+    parents: "interface {{ item.name }}"
+  loop: "{{ gre_tunnels }}"
+  loop_control:
+    label: "{{ item.name }}"
+  notify: save config
+
+# ---- VERIFICACIÓN ----
+- name: "[OSPF] Verificar vecinos OSPF establecidos"
+  cisco.ios.ios_command:
+    commands:
+      - "show ip ospf neighbor"
+      - "show ip route ospf"
+  register: ospf_status
+
+- name: "[OSPF] Mostrar vecinos y rutas OSPF"
+  debug:
+    msg: "{{ ospf_status.stdout_lines }}"
+
+- name: "[OSPF] Validar que existen vecinos OSPF"
+  assert:
+    that:
+      - ospf_status.stdout[0] | length > 0
+    fail_msg: "¡ERROR! No se encontraron vecinos OSPF en {{ inventory_hostname }}"
+    success_msg: "OK - Vecinos OSPF encontrados en {{ inventory_hostname }}"

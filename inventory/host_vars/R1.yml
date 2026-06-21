@@ -1,0 +1,59 @@
+---
+# =============================================================
+# host_vars/R1.yml — Variables específicas de R1
+# =============================================================
+
+hostname: "R1"
+
+# Interfaces físicas
+interfaces:
+  wan:
+    name: "GigabitEthernet0/0"
+    ip: "10.0.0.1"
+    mask: "255.255.255.0"
+    description: "WAN - Red de gestion y transporte"
+  lan:
+    name: "GigabitEthernet0/1"
+    ip: "192.168.1.1"
+    mask: "255.255.255.0"
+    description: "LAN local R1"
+
+# OSPF Router-ID
+ospf_router_id: "1.1.1.1"
+
+# Redes que R1 anunciará por OSPF
+ospf_networks:
+  - network: "192.168.1.0"
+    wildcard: "0.0.0.255"
+    area: 0
+  - network: "172.16.12.0"
+    wildcard: "0.0.0.3"
+    area: 0
+  - network: "172.16.13.0"
+    wildcard: "0.0.0.3"
+    area: 0
+
+# Túneles GRE — R1 tiene 2 túneles (hacia R2 y hacia R3)
+gre_tunnels:
+  - name: "Tunnel12"
+    number: 12
+    local_ip: "172.16.12.1"
+    mask: "255.255.255.252"
+    source_interface: "GigabitEthernet0/0"
+    destination: "10.0.0.2"       # IP WAN de R2
+    description: "GRE Tunnel R1 to R2"
+
+  - name: "Tunnel13"
+    number: 13
+    local_ip: "172.16.13.1"
+    mask: "255.255.255.252"
+    source_interface: "GigabitEthernet0/0"
+    destination: "10.0.0.3"       # IP WAN de R3
+    description: "GRE Tunnel R1 to R3"
+
+# Peers IPSec de R1
+ipsec_peers:
+  - peer_ip: "10.0.0.2"           # R2
+    tunnel_interface: "Tunnel12"
+  - peer_ip: "10.0.0.3"           # R3
+    tunnel_interface: "Tunnel13"

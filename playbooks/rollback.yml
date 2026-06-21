@@ -1,0 +1,38 @@
+---
+# =============================================================
+# playbooks/rollback.yml
+# Elimina la configuración de VPN (GRE, IPSec, OSPF)
+# Uso: ansible-playbook playbooks/rollback.yml
+# =============================================================
+
+- name: "ROLLBACK - Eliminar configuración VPN"
+  hosts: routers
+  gather_facts: false
+
+  tasks:
+    - name: "[ROLLBACK] Eliminar túneles GRE"
+      cisco.ios.ios_config:
+        lines:
+          - "no interface {{ item.name }}"
+      loop: "{{ gre_tunnels }}"
+      loop_control:
+        label: "Eliminando {{ item.name }}"
+      failed_when: false
+
+    - name: "[ROLLBACK] Eliminar proceso OSPF"
+      cisco.ios.ios_config:
+        lines:
+          - "no router ospf {{ ospf_process_id }}"
+      failed_when: false
+
+    - name: "[ROLLBACK] Eliminar configuración IPSec"
+      cisco.ios.ios_config:
+        lines:
+          - "no crypto ipsec profile {{ ipsec_profile_name }}"
+          - "no crypto isakmp policy {{ ike_policy_number }}"
+          - "no crypto keyring {{ ipsec_keyring_name }}"
+      failed_when: false
+
+    - name: "[ROLLBACK] Guardar configuración limpia"
+      cisco.ios.ios_config:
+        save_when: always

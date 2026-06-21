@@ -1,0 +1,39 @@
+---
+# =============================================================
+# roles/gre_tunnels/tasks/main.yml
+# Crea los túneles GRE del full-mesh para cada router
+# =============================================================
+
+- name: "[GRE] Configurar túneles GRE (loop sobre gre_tunnels)"
+  cisco.ios.ios_config:
+    lines:
+      - "description {{ item.description }}"
+      - "ip address {{ item.local_ip }} {{ item.mask }}"
+      - "tunnel source {{ item.source_interface }}"
+      - "tunnel destination {{ item.destination }}"
+      - "ip mtu {{ gre_tunnel_mtu }}"
+      - "ip tcp adjust-mss {{ gre_tunnel_mtu | int - 40 }}"
+      - "bandwidth {{ gre_tunnel_bandwidth }}"
+      - "keepalive 10 3"
+      - "no shutdown"
+    parents: "interface {{ item.name }}"
+  loop: "{{ gre_tunnels }}"
+  loop_control:
+    label: "{{ item.name }} → {{ item.destination }}"
+  notify: save config
+
+- name: "[GRE] Verificar estado de los túneles"
+  cisco.ios.ios_command:
+    commands:
+      - "show interfaces {{ item.name }} | include line protocol"
+  loop: "{{ gre_tunnels }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: tunnel_status
+
+- name: "[GRE] Mostrar estado de túneles"
+  debug:
+    msg: "{{ item.stdout[0] }}"
+  loop: "{{ tunnel_status.results }}"
+  loop_control:
+    label: "Tunnel {{ ansible_loop.index }}"

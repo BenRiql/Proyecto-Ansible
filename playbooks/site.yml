@@ -1,0 +1,68 @@
+---
+# =============================================================
+# playbooks/site.yml — Playbook principal
+# Despliega la topología VPN IPSec/GRE/OSPF full-mesh completa
+# Uso: ansible-playbook playbooks/site.yml
+# =============================================================
+
+- name: "FASE 1 - Configuración base de routers Cisco IOSv"
+  hosts: routers
+  gather_facts: false
+  serial: 1           # Configurar de a un router a la vez
+
+  roles:
+    - role: base
+      tags: [base, always]
+
+- name: "FASE 2 - Despliegue de túneles GRE full-mesh"
+  hosts: routers
+  gather_facts: false
+
+  roles:
+    - role: gre_tunnels
+      tags: [gre, tunnels]
+
+- name: "FASE 3 - Aplicar cifrado IPSec sobre túneles GRE"
+  hosts: routers
+  gather_facts: false
+
+  roles:
+    - role: ipsec
+      tags: [ipsec, vpn]
+
+- name: "FASE 4 - Configurar enrutamiento OSPF"
+  hosts: routers
+  gather_facts: false
+
+  roles:
+    - role: ospf
+      tags: [ospf, routing]
+
+- name: "FASE 5 - Verificación end-to-end"
+  hosts: routers
+  gather_facts: false
+  tags: [verify, test]
+
+  tasks:
+    - name: "[VERIFY] Ping entre LANs a través de la VPN"
+      cisco.ios.ios_ping:
+        dest: "{{ item }}"
+        count: 5
+        source: "{{ interfaces.lan.ip }}"
+      loop: "{{ groups['routers']
+               | map('extract', hostvars, ['interfaces', 'lan', 'ip'])
+               | list
+               | difference([interfaces.lan.ip]) }}"
+      loop_control:
+        label: "ping {{ interfaces.lan.ip }} → {{ item }}"
+      register: ping_results
+      failed_when: ping_results.packet_loss == '100%'
+
+    - name: "[VERIFY] Resultado de conectividad"
+      debug:
+        msg: >
+          {{ inventory_hostname }} → {{ item.item }}:
+          {{ item.packet_loss }} pérdida de paquetes
+      loop: "{{ ping_results.results }}"
+      loop_control:
+        label: "{{ item.item }}"
