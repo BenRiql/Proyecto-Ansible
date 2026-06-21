@@ -23,7 +23,7 @@ RUN pip install --no-cache-dir \
     yamllint==1.35.1 \
     paramiko==3.4.0 \
     netmiko==4.3.0 \
-    ncclient==0.6.15
+    ncclient==0.6.15 \
     netaddr==1.3.0
 # Instalar colección oficial de Cisco IOS para Ansible
 RUN ansible-galaxy collection install cisco.ios:==4.6.1
