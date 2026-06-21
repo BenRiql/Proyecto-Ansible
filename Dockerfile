@@ -8,6 +8,7 @@ RUN apt-get update && apt-get install -y \
     openssh-client \
     sshpass \
     iputils-ping \
+    iproute2 \
     net-tools \
     curl \
     git \
@@ -23,7 +24,7 @@ RUN pip install --no-cache-dir \
     paramiko==3.4.0 \
     netmiko==4.3.0 \
     ncclient==0.6.15
-
+    netaddr==1.3.0
 # Instalar colección oficial de Cisco IOS para Ansible
 RUN ansible-galaxy collection install cisco.ios:==4.6.1
 
