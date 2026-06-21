@@ -1,9 +1,4 @@
 ---
-# =============================================================
-# roles/gre_tunnels/tasks/main.yml
-# Crea los túneles GRE del full-mesh para cada router
-# =============================================================
-
 - name: "[GRE] Configurar túneles GRE (loop sobre gre_tunnels)"
   cisco.ios.ios_config:
     lines:
@@ -36,4 +31,4 @@
     msg: "{{ item.stdout[0] }}"
   loop: "{{ tunnel_status.results }}"
   loop_control:
-    label: "Tunnel {{ ansible_loop.index }}"
+    label: "{{ item.item.name }}"

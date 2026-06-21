@@ -35,20 +35,20 @@ gre_tunnels:
     number: 21
     local_ip: "172.16.12.2"
     mask: "255.255.255.252"
-    source_interface: "GigabitEthernet0/0"
-    destination: "10.0.0.1"       # IP WAN de R1
-    description: "GRE Tunnel R2 to R1"
+    source_interface: "GigabitEthernet0/1"
+    destination: "192.168.12.1"
+    description: "GRE R2 a R1"
 
   - name: "Tunnel23"
     number: 23
     local_ip: "172.16.23.1"
     mask: "255.255.255.252"
-    source_interface: "GigabitEthernet0/0"
-    destination: "10.0.0.3"       # IP WAN de R3
-    description: "GRE Tunnel R2 to R3"
+    source_interface: "GigabitEthernet0/2"
+    destination: "192.168.23.2"
+    description: "GRE R2 a R3"
 
 ipsec_peers:
-  - peer_ip: "10.0.0.1"           # R1
+  - peer_ip: "192.168.12.1"
     tunnel_interface: "Tunnel21"
-  - peer_ip: "10.0.0.3"           # R3
+  - peer_ip: "192.168.23.2"
     tunnel_interface: "Tunnel23"

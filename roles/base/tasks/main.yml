@@ -1,16 +1,11 @@
 ---
-# =============================================================
-# roles/base/tasks/main.yml
-# Configuración base del router: hostname, SSH, interfaces
-# =============================================================
-
 - name: "[BASE] Configurar hostname"
   cisco.ios.ios_hostname:
     config:
       hostname: "{{ hostname }}"
     state: merged
 
-- name: "[BASE] Deshabilitar búsqueda DNS (evita delays)"
+- name: "[BASE] Deshabilitar búsqueda DNS"
   cisco.ios.ios_config:
     lines:
       - no ip domain-lookup
@@ -24,12 +19,12 @@
       - "enable secret enable123"
   notify: save config
 
-- name: "[BASE] Generar clave RSA para SSH (idempotente)"
+- name: "[BASE] Generar clave RSA para SSH"
   cisco.ios.ios_config:
     lines:
       - crypto key generate rsa modulus 2048
   register: rsa_result
-  failed_when: false   # No falla si la clave ya existe
+  failed_when: false
   changed_when: "'The name for the keys will be' in rsa_result.stdout | default('')"
 
 - name: "[BASE] Habilitar SSH versión 2"
@@ -49,45 +44,9 @@
     parents: line vty 0 4
   notify: save config
 
-- name: "[BASE] Configurar interfaz WAN"
-  cisco.ios.ios_l3_interfaces:
-    config:
-      - name: "{{ interfaces.wan.name }}"
-        ipv4:
-          - address: "{{ interfaces.wan.ip }}/{{ interfaces.wan.mask | ansible.utils.ipaddr('prefix') }}"
-    state: merged
-  notify: save config
-
-- name: "[BASE] Habilitar interfaz WAN"
-  cisco.ios.ios_interfaces:
-    config:
-      - name: "{{ interfaces.wan.name }}"
-        description: "{{ interfaces.wan.description }}"
-        enabled: true
-    state: merged
-  notify: save config
-
-- name: "[BASE] Configurar interfaz LAN"
-  cisco.ios.ios_l3_interfaces:
-    config:
-      - name: "{{ interfaces.lan.name }}"
-        ipv4:
-          - address: "{{ interfaces.lan.ip }}/{{ interfaces.lan.mask | ansible.utils.ipaddr('prefix') }}"
-    state: merged
-  notify: save config
-
-- name: "[BASE] Habilitar interfaz LAN"
-  cisco.ios.ios_interfaces:
-    config:
-      - name: "{{ interfaces.lan.name }}"
-        description: "{{ interfaces.lan.description }}"
-        enabled: true
-    state: merged
-  notify: save config
-
 - name: "[BASE] Verificar conectividad al gateway de gestión"
   cisco.ios.ios_ping:
-    dest: "10.0.0.100"    # IP del contenedor Ansible
+    dest: "10.0.0.100"
     count: 3
   register: ping_result
   failed_when: ping_result.packet_loss == '100%'

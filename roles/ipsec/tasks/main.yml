@@ -1,11 +1,4 @@
 ---
-# =============================================================
-# roles/ipsec/tasks/main.yml
-# Configura IPSec sobre los túneles GRE (cifrado)
-# Phase 1: IKE policy / Phase 2: Transform-set + Crypto map
-# =============================================================
-
-# ---- PHASE 1: IKE ----
 - name: "[IPSEC] Configurar IKE Policy (Phase 1)"
   cisco.ios.ios_config:
     lines:
@@ -17,7 +10,6 @@
     parents: "crypto isakmp policy {{ ike_policy_number }}"
   notify: save config
 
-# ---- KEYRING: pre-shared keys por peer ----
 - name: "[IPSEC] Configurar pre-shared keys por peer"
   cisco.ios.ios_config:
     lines:
@@ -28,7 +20,6 @@
     label: "PSK → {{ item.peer_ip }}"
   notify: save config
 
-# ---- ISAKMP PROFILE: asociar keyring a los peers ----
 - name: "[IPSEC] Configurar ISAKMP profile"
   cisco.ios.ios_config:
     lines:
@@ -40,15 +31,12 @@
     label: "ISAKMP profile → {{ item.peer_ip }}"
   notify: save config
 
-# ---- PHASE 2: TRANSFORM SET ----
 - name: "[IPSEC] Configurar Transform Set (Phase 2)"
   cisco.ios.ios_config:
     lines:
       - "crypto ipsec transform-set {{ ipsec_transform_set }} {{ ipsec_encryption }} {{ ipsec_auth }}"
-      - "mode transport"
   notify: save config
 
-# ---- IPSEC PROFILE: asociar transform-set a los túneles ----
 - name: "[IPSEC] Configurar IPSec Profile"
   cisco.ios.ios_config:
     lines:
@@ -60,7 +48,6 @@
     label: "IPSec profile → {{ item.peer_ip }}"
   notify: save config
 
-# ---- APLICAR IPSEC PROFILE A CADA TÚNEL GRE ----
 - name: "[IPSEC] Aplicar IPSec profile a interfaces de túnel"
   cisco.ios.ios_config:
     lines:
@@ -71,12 +58,10 @@
     label: "{{ item.tunnel_interface }} → {{ item.peer_ip }}"
   notify: save config
 
-# ---- VERIFICACIÓN ----
 - name: "[IPSEC] Verificar SAs establecidas"
   cisco.ios.ios_command:
     commands:
       - "show crypto isakmp sa"
-      - "show crypto ipsec sa summary"
   register: ipsec_sa_status
 
 - name: "[IPSEC] Mostrar estado de SAs"
