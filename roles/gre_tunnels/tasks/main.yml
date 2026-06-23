@@ -9,7 +9,7 @@
       - "ip mtu {{ gre_tunnel_mtu }}"
       - "ip tcp adjust-mss {{ gre_tunnel_mtu | int - 40 }}"
       - "bandwidth {{ gre_tunnel_bandwidth }}"
-      - "keepalive 10 3"
+      - "no keepalive"
       - "no shutdown"
     parents: "interface {{ item.name }}"
   loop: "{{ gre_tunnels }}"
