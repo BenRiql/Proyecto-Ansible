@@ -1,7 +1,7 @@
 # Proyecto: Automatización VPN IPSec/GRE/OSPF Full-Mesh con Ansible
 
 **Redes Avanzadas I — INACAP**
-**Integrantes:** [Nombre 1] · [Nombre 2]
+**Integrantes:** Benjamin Riquelme Landero · David Pradenas Leiva
 
 ---
 
