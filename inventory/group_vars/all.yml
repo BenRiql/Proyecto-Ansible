@@ -18,7 +18,7 @@ ospf_router_id_prefix: "1.1.1."   # Se completa con el número del router
 ipsec_keyring_name: "VPN_KEYRING"
 ipsec_profile_name: "VPN_PROFILE"
 ipsec_transform_set: "VPN_TS"
-ipsec_preshared_key: "C1sc0Lab2024!"   # Reemplazar con ansible-vault en producción
+ipsec_preshared_key: "{{ lookup('env', 'IPSEC_PSK') }}"   # Ver .env.example / GitHub Secrets
 
 # MTU de los túneles GRE
 gre_tunnel_mtu: 1400

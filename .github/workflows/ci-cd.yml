@@ -1,0 +1,182 @@
+---
+name: CI/CD - VPN Ansible Pipeline
+
+# =============================================================
+# Pipeline de CI/CD — Proyecto VPN IPSec/GRE/OSPF con Ansible
+# Redes Avanzadas I — INACAP
+# =============================================================
+# STAGES:
+#   1. lint      -> yamllint + ansible-lint + syntax-check   (runner de GitHub, sin acceso al lab)
+#   2. dry-run   -> ansible-playbook --check --diff          (runner self-hosted, con acceso a GNS3)
+#   3. deploy    -> ansible-playbook real                    (runner self-hosted, solo si 1 y 2 pasan)
+#   4. notify    -> email con el resultado final del pipeline
+# =============================================================
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: {}   # permite además dispararlo manualmente desde GitHub
+
+jobs:
+
+  # -----------------------------------------------------------
+  # STAGE 1: Lint y validación de sintaxis
+  # No necesita conectividad con los routers -> corre en runner de GitHub
+  # -----------------------------------------------------------
+  lint:
+    name: "Lint & Syntax Check"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Instalar dependencias
+        run: |
+          pip install --no-cache-dir \
+            ansible==9.5.1 \
+            ansible-lint==6.22.2 \
+            yamllint==1.35.1
+
+      - name: Instalar colecciones de Ansible Galaxy
+        run: ansible-galaxy collection install -r requirements.yml
+
+      - name: yamllint - validar formato YAML
+        run: |
+          yamllint -d '{extends: default, rules: {line-length: {max: 160}, truthy: {ignore: [".github/workflows/*.yml"]}}}' .
+
+      - name: ansible-lint - buenas prácticas de Ansible
+        env:
+          # Variables dummy solo para que el lint no falle por lookup(env, ...) vacío
+          ANSIBLE_USER: "admin"
+          ANSIBLE_PASSWORD: "dummy-for-lint-only"
+          ANSIBLE_BECOME_PASSWORD: "dummy-for-lint-only"
+          IPSEC_PSK: "dummy-for-lint-only"
+        run: ansible-lint playbooks/site.yml playbooks/rollback.yml
+
+      - name: ansible-playbook --syntax-check
+        env:
+          ANSIBLE_USER: "admin"
+          ANSIBLE_PASSWORD: "dummy-for-lint-only"
+          ANSIBLE_BECOME_PASSWORD: "dummy-for-lint-only"
+          IPSEC_PSK: "dummy-for-lint-only"
+        run: |
+          ansible-playbook playbooks/site.yml --syntax-check
+          ansible-playbook playbooks/rollback.yml --syntax-check
+
+  # -----------------------------------------------------------
+  # STAGE 2: Dry-run contra el laboratorio real (--check --diff)
+  # Necesita llegar a 10.0.0.0/24 -> requiere el runner self-hosted
+  # registrado en la laptop donde corre GNS3
+  # -----------------------------------------------------------
+  dry-run:
+    name: "Dry-run contra GNS3 (--check --diff)"
+    needs: lint
+    runs-on: self-hosted
+    environment: lab-gns3
+    env:
+      ANSIBLE_USER: ${{ secrets.ANSIBLE_USER }}
+      ANSIBLE_PASSWORD: ${{ secrets.ANSIBLE_PASSWORD }}
+      ANSIBLE_BECOME_PASSWORD: ${{ secrets.ANSIBLE_BECOME_PASSWORD }}
+      IPSEC_PSK: ${{ secrets.IPSEC_PSK }}
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Verificar conectividad básica con los routers
+        run: |
+          for ip in 10.0.0.1 10.0.0.2 10.0.0.3; do
+            ping -c 1 -W 2 "$ip" || echo "AVISO: $ip no responde (¿está GNS3 corriendo?)"
+          done
+
+      - name: Instalar colecciones de Ansible Galaxy
+        run: ansible-galaxy collection install -r requirements.yml
+
+      - name: ansible routers -m ping
+        run: ansible routers -m ping
+
+      - name: Dry-run del playbook completo (sin aplicar cambios)
+        run: ansible-playbook playbooks/site.yml --check --diff
+
+  # -----------------------------------------------------------
+  # STAGE 3: Despliegue real
+  # Solo corre automáticamente en push a main, y solo si lint + dry-run pasaron
+  # -----------------------------------------------------------
+  deploy:
+    name: "Despliegue real (ansible-playbook)"
+    needs: dry-run
+    runs-on: self-hosted
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    environment: lab-gns3
+    env:
+      ANSIBLE_USER: ${{ secrets.ANSIBLE_USER }}
+      ANSIBLE_PASSWORD: ${{ secrets.ANSIBLE_PASSWORD }}
+      ANSIBLE_BECOME_PASSWORD: ${{ secrets.ANSIBLE_BECOME_PASSWORD }}
+      IPSEC_PSK: ${{ secrets.IPSEC_PSK }}
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Instalar colecciones de Ansible Galaxy
+        run: ansible-galaxy collection install -r requirements.yml
+
+      - name: Despliegue completo de la VPN (GRE + IPSec + OSPF)
+        run: ansible-playbook playbooks/site.yml
+
+      - name: Verificación end-to-end (ping entre LANs)
+        run: ansible-playbook playbooks/site.yml --tags verify
+
+  # -----------------------------------------------------------
+  # STAGE 4: Notificación por email con el resultado del pipeline
+  # Corre siempre, sin importar si algo falló, para que el equipo se entere
+  # -----------------------------------------------------------
+  notify:
+    name: "Notificación por email"
+    needs: [lint, dry-run, deploy]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Determinar estado general del pipeline
+        id: status
+        run: |
+          if [ "${{ needs.deploy.result }}" == "success" ]; then
+            echo "estado=✅ Despliegue exitoso" >> "$GITHUB_OUTPUT"
+          elif [ "${{ needs.dry-run.result }}" == "failure" ] || [ "${{ needs.lint.result }}" == "failure" ]; then
+            echo "estado=❌ Pipeline falló en lint/dry-run" >> "$GITHUB_OUTPUT"
+          elif [ "${{ needs.deploy.result }}" == "skipped" ]; then
+            echo "estado=⚠️ Deploy omitido (no era push a main)" >> "$GITHUB_OUTPUT"
+          else
+            echo "estado=❌ Despliegue falló" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Enviar email con el resultado
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: "[VPN Ansible CI/CD] ${{ steps.status.outputs.estado }} — ${{ github.repository }}"
+          to: ${{ secrets.EMAIL_TO }}
+          from: "CI/CD Proyecto VPN <${{ secrets.EMAIL_USERNAME }}>"
+          body: |
+            Resultado del pipeline: ${{ steps.status.outputs.estado }}
+
+            Repositorio: ${{ github.repository }}
+            Rama: ${{ github.ref_name }}
+            Commit: ${{ github.sha }}
+            Disparado por: ${{ github.actor }}
+
+            Resultados por etapa:
+              - Lint:     ${{ needs.lint.result }}
+              - Dry-run:  ${{ needs.dry-run.result }}
+              - Deploy:   ${{ needs.deploy.result }}
+
+            Ver detalles completos:
+            https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
