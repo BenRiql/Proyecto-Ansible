@@ -27,7 +27,7 @@
   register: tunnel_status
 
 - name: "[GRE] Mostrar estado de túneles"
-  debug:
+  ansible.builtin.debug:
     msg: "{{ item.stdout[0] }}"
   loop: "{{ tunnel_status.results }}"
   loop_control:

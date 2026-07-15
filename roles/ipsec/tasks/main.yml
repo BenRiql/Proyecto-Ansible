@@ -65,5 +65,5 @@
   register: ipsec_sa_status
 
 - name: "[IPSEC] Mostrar estado de SAs"
-  debug:
+  ansible.builtin.debug:
     msg: "{{ ipsec_sa_status.stdout_lines }}"

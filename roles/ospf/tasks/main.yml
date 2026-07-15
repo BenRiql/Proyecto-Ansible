@@ -36,5 +36,5 @@
   register: ospf_status
 
 - name: "[OSPF] Mostrar vecinos y rutas OSPF"
-  debug:
+  ansible.builtin.debug:
     msg: "{{ ospf_status.stdout_lines }}"

@@ -1,4 +1,4 @@
 ---
-- name: save config
+- name: Save config
   cisco.ios.ios_config:
     save_when: modified
