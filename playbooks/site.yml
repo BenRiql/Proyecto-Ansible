@@ -44,7 +44,7 @@
   tags: [verify, test]
 
   tasks:
-- name: "[VERIFY] Ping entre LANs a través de la VPN"
+    - name: "[VERIFY] Ping entre LANs a través de la VPN"
       cisco.ios.ios_ping:
         dest: "{{ item }}"
         count: 5
@@ -70,10 +70,3 @@
       loop_control:
         label: "{{ item.item }}"
       when: ping_results.results is defined
-      ansible.builtin.debug:
-        msg: >
-          {{ inventory_hostname }} → {{ item.item }}:
-          {{ item.packet_loss }} pérdida de paquetes
-      loop: "{{ ping_results.results }}"
-      loop_control:
-        label: "{{ item.item }}"
