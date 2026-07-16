@@ -191,3 +191,12 @@ ansible-vault encrypt inventory/group_vars/all.yml
 # Ejecutar playbook con vault
 ansible-playbook playbooks/site.yml --ask-vault-pass
 ```
+
+## Historial de troubleshooting (Fase 2)
+
+Durante la implementación del pipeline CI/CD se resolvieron los siguientes problemas reales:
+
+- Credenciales SSH/enable movidas de texto plano a variables de entorno y GitHub Secrets.
+- Hallazgos de `ansible-lint` corregidos (FQCN en módulos, naming de handlers).
+- Runner self-hosted registrado dentro del contenedor Ansible en GNS3, con una interfaz de red adicional conectada a un nodo NAT para dar acceso a internet sin perder la conectividad al laboratorio.
+- Ajuste del playbook de verificación end-to-end para que el ping funcione correctamente también en modo `--check` (dry-run).
