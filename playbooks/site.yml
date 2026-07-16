@@ -44,7 +44,7 @@
   tags: [verify, test]
 
   tasks:
-    - name: "[VERIFY] Ping entre LANs a través de la VPN"
+- name: "[VERIFY] Ping entre LANs a través de la VPN"
       cisco.ios.ios_ping:
         dest: "{{ item }}"
         count: 5
@@ -56,9 +56,20 @@
       loop_control:
         label: "ping {{ interfaces.lan.ip }} → {{ item }}"
       register: ping_results
+      # El ping es una operación de solo lectura (no cambia la config del router),
+      # así que la forzamos a correr incluso en modo --check/--diff.
+      check_mode: false
       failed_when: ping_results.packet_loss == '100%'
 
     - name: "[VERIFY] Resultado de conectividad"
+      ansible.builtin.debug:
+        msg: >
+          {{ inventory_hostname }} → {{ item.item }}:
+          {{ item.packet_loss | default('N/A') }} pérdida de paquetes
+      loop: "{{ ping_results.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+      when: ping_results.results is defined
       ansible.builtin.debug:
         msg: >
           {{ inventory_hostname }} → {{ item.item }}:
