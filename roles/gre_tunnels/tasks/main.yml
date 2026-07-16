@@ -15,7 +15,7 @@
   loop: "{{ gre_tunnels }}"
   loop_control:
     label: "{{ item.name }} → {{ item.destination }}"
-  notify: save config
+  notify: Save config
 
 - name: "[GRE] Verificar estado de los túneles"
   cisco.ios.ios_command:

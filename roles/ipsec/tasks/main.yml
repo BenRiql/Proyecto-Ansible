@@ -8,7 +8,7 @@
       - "group {{ ike_dh_group }}"
       - "lifetime {{ ike_lifetime }}"
     parents: "crypto isakmp policy {{ ike_policy_number }}"
-  notify: save config
+  notify: Save config
 
 - name: "[IPSEC] Configurar pre-shared keys por peer"
   cisco.ios.ios_config:
@@ -18,7 +18,7 @@
   loop: "{{ ipsec_peers }}"
   loop_control:
     label: "PSK → {{ item.peer_ip }}"
-  notify: save config
+  notify: Save config
 
 - name: "[IPSEC] Configurar ISAKMP profile"
   cisco.ios.ios_config:
@@ -29,13 +29,13 @@
   loop: "{{ ipsec_peers }}"
   loop_control:
     label: "ISAKMP profile → {{ item.peer_ip }}"
-  notify: save config
+  notify: Save config
 
 - name: "[IPSEC] Configurar Transform Set (Phase 2)"
   cisco.ios.ios_config:
     lines:
       - "crypto ipsec transform-set {{ ipsec_transform_set }} {{ ipsec_encryption }} {{ ipsec_auth }}"
-  notify: save config
+  notify: Save config
 
 - name: "[IPSEC] Configurar IPSec Profile"
   cisco.ios.ios_config:
@@ -46,7 +46,7 @@
   loop: "{{ ipsec_peers }}"
   loop_control:
     label: "IPSec profile → {{ item.peer_ip }}"
-  notify: save config
+  notify: Save config
 
 - name: "[IPSEC] Aplicar IPSec profile a interfaces de túnel"
   cisco.ios.ios_config:
@@ -56,7 +56,7 @@
   loop: "{{ ipsec_peers }}"
   loop_control:
     label: "{{ item.tunnel_interface }} → {{ item.peer_ip }}"
-  notify: save config
+  notify: Save config
 
 - name: "[IPSEC] Verificar SAs establecidas"
   cisco.ios.ios_command:
