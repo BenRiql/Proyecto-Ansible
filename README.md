@@ -179,16 +179,111 @@ ping 192.168.3.1 source GigabitEthernet0/1
 
 ---
 
-## Seguridad
+## CI/CD con GitHub Actions
 
-Las contraseñas en `group_vars/all.yml` y `host_vars/` son de laboratorio.
-En producción, usar **ansible-vault**:
+El proyecto incluye un pipeline automatizado en `.github/workflows/ci-cd.yml` con 4 etapas:
+
+```
+push/PR a main
+      │
+      ▼
+┌─────────────┐     ┌──────────────────┐     ┌─────────────┐     ┌──────────────┐
+│    lint     │────▶│     dry-run      │────▶│   deploy    │────▶│   notify     │
+│ (GitHub-    │     │ (self-hosted,    │     │ (self-hosted│     │ (GitHub-     │
+│  hosted)    │     │  contra GNS3)    │     │  solo main) │     │  hosted)     │
+└─────────────┘     └──────────────────┘     └─────────────┘     └──────────────┘
+yamllint             ansible-playbook          ansible-playbook     email con
+ansible-lint         --check --diff            site.yml completo    resultado
+syntax-check                                   + verificación       final
+```
+
+- **lint**: corre en un runner de GitHub (no necesita el laboratorio). Valida sintaxis YAML,
+  buenas prácticas de Ansible y que los playbooks parseen correctamente.
+- **dry-run**: corre en un runner **self-hosted** (dentro del contenedor Ansible en GNS3,
+  con acceso a la red 10.0.0.0/24 de los routers). Simula los cambios con `--check --diff`
+  sin aplicarlos.
+- **deploy**: solo se ejecuta automáticamente en push a `main`, y solo si `lint` y `dry-run`
+  pasaron. Aplica la configuración real y corre la verificación end-to-end (`--tags verify`).
+- **notify**: envía un correo con el resultado del pipeline (éxito o falla), sin importar
+  en qué etapa haya terminado.
+
+### 1. Registrar el runner self-hosted
+
+El runner corre dentro del contenedor Ansible de la topología GNS3, porque es el único punto
+con acceso simultáneo a internet (necesario para hablar con GitHub) y a la red de los routers.
+Para esto se le agregó una segunda interfaz de red al contenedor, conectada a un nodo NAT.
+
+En GitHub: **Actions → Runners → New self-hosted runner** (Linux/x64), y dentro de la consola
+del contenedor:
 
 ```bash
-# Cifrar archivo de variables sensibles
-ansible-vault encrypt inventory/group_vars/all.yml
+mkdir -p /opt/actions-runner && cd /opt/actions-runner
+curl -o actions-runner-linux-x64-2.335.1.tar.gz -L \
+  https://github.com/actions/runner/releases/download/v2.335.1/actions-runner-linux-x64-2.335.1.tar.gz
+tar xzf ./actions-runner-linux-x64-2.335.1.tar.gz
+./bin/installdependencies.sh
 
-# Ejecutar playbook con vault
+export RUNNER_ALLOW_RUNASROOT=1
+./config.sh --url https://github.com/BenRiql/Proyecto-Ansible --token <TOKEN_QUE_DA_GITHUB>
+
+# Dejarlo corriendo en segundo plano, para que no se corte al cerrar la terminal
+nohup ./run.sh > runner.log 2>&1 &
+```
+
+Nota: como el contenedor GNS3 puede perder el filesystem entre reinicios, si el runner
+desaparece hay que repetir estos pasos con un token nuevo (se genera desde la misma pantalla
+de GitHub).
+
+### 2. Configurar los Secrets del repositorio
+
+En **Settings → Secrets and variables → Actions → New repository secret**, crear:
+
+| Secret | Descripción |
+|---|---|
+| `ANSIBLE_USER` | Usuario SSH de los routers |
+| `ANSIBLE_PASSWORD` | Contraseña SSH |
+| `ANSIBLE_BECOME_PASSWORD` | Contraseña de modo enable |
+| `IPSEC_PSK` | Clave precompartida IPSec |
+| `EMAIL_USERNAME` | Correo Gmail remitente |
+| `EMAIL_PASSWORD` | [Contraseña de aplicación de Gmail](https://myaccount.google.com/apppasswords) (no la contraseña normal) |
+| `EMAIL_TO` | Correo(s) donde llega la notificación |
+
+### 3. Disparar el pipeline
+
+Con GNS3 y el runner corriendo:
+
+```bash
+git add .
+git commit -m "feat: cambio de ejemplo"
+git push origin main
+```
+
+También se puede disparar manualmente desde la pestaña **Actions** del repo (`workflow_dispatch`).
+
+## Seguridad
+
+Las credenciales (`ansible_password`, `ansible_become_password`, `ipsec_preshared_key`) ya
+**no están hardcodeadas** en el repositorio: se leen desde variables de entorno mediante
+`lookup('env', ...)` en `inventory/hosts.ini` y `inventory/group_vars/all.yml`.
+
+**Para ejecutar localmente** (fuera de CI/CD):
+
+```bash
+cp .env.example .env
+# Edita .env con tus valores reales (este archivo NUNCA se sube a git)
+export $(grep -v '^#' .env | xargs)
+ansible routers -m ping
+```
+
+**En CI/CD**, estas mismas variables se inyectan automáticamente desde los **Secrets de
+GitHub Actions** (ver sección de CI/CD más arriba) — nunca quedan expuestas en el código
+ni en los logs del pipeline.
+
+Como alternativa/complemento, también se puede usar **ansible-vault** para cifrar archivos
+completos:
+
+```bash
+ansible-vault encrypt inventory/group_vars/all.yml
 ansible-playbook playbooks/site.yml --ask-vault-pass
 ```
 
