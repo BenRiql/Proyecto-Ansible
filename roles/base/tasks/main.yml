@@ -50,3 +50,4 @@
     count: 3
   register: ping_result
   failed_when: ping_result.packet_loss == '100%'
+# Demo video - jue 16 jul 2026 05:01:06 -04
